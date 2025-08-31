@@ -1,10 +1,11 @@
 import { Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { NotificationsComponent } from './components/notifications/notifications';
+import { TokenValidatorComponent } from './components/token-validator/token-validator';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, NotificationsComponent],
+  imports: [RouterOutlet, NotificationsComponent, TokenValidatorComponent],
   templateUrl: './app.html',
   styleUrl: './app.css'
 })

@@ -2,25 +2,13 @@ import { Routes } from '@angular/router';
 import { inject } from '@angular/core';
 import { AuthService } from './services/auth';
 import { Router } from '@angular/router';
+import { AuthGuard } from './guards/auth.guard';
 
 import { LoginComponent } from './components/login/login';
 import { DashboardComponent } from './components/dashboard/dashboard';
 import { PosComponent } from './components/pos/pos';
 import { ProductosComponent } from './components/productos/productos';
 import { ReportesComponent } from './components/reportes/reportes';
-
-// Guard para rutas protegidas
-const authGuard = () => {
-  const authService = inject(AuthService);
-  const router = inject(Router);
-
-  if (authService.isAuthenticated()) {
-    return true;
-  } else {
-    router.navigate(['/login']);
-    return false;
-  }
-};
 
 // Guard para rutas públicas (login)
 const publicGuard = () => {
@@ -45,22 +33,22 @@ export const routes: Routes = [
   { 
     path: 'dashboard', 
     component: DashboardComponent,
-    canActivate: [authGuard]
+    canActivate: [AuthGuard]
   },
   { 
     path: 'pos', 
     component: PosComponent,
-    canActivate: [authGuard]
+    canActivate: [AuthGuard]
   },
   { 
     path: 'productos', 
     component: ProductosComponent,
-    canActivate: [authGuard]
+    canActivate: [AuthGuard]
   },
   { 
     path: 'reportes', 
     component: ReportesComponent,
-    canActivate: [authGuard]
+    canActivate: [AuthGuard]
   },
   { path: '**', redirectTo: '/dashboard' }
 ];
