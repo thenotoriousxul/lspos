@@ -1,9 +1,10 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { AuthService, User } from '../../services/auth';
 import { VentasService, EstadisticasVentas } from '../../services/ventas';
 import { ProductosService } from '../../services/productos';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-dashboard',
@@ -11,11 +12,12 @@ import { ProductosService } from '../../services/productos';
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.css'
 })
-export class DashboardComponent implements OnInit {
+export class DashboardComponent implements OnInit, OnDestroy {
   private authService = inject(AuthService);
   private ventasService = inject(VentasService);
   private productosService = inject(ProductosService);
   private router = inject(Router);
+  private userSubscription?: Subscription;
 
   currentUser: User | null = null;
   estadisticas: EstadisticasVentas = {
@@ -28,8 +30,18 @@ export class DashboardComponent implements OnInit {
   isLoading = true;
 
   ngOnInit() {
-    this.currentUser = this.authService.currentUser;
+    // Suscribirse al observable del usuario para obtener datos actualizados
+    this.userSubscription = this.authService.currentUser$.subscribe(user => {
+      this.currentUser = user;
+    });
+    
     this.loadDashboardData();
+  }
+
+  ngOnDestroy() {
+    if (this.userSubscription) {
+      this.userSubscription.unsubscribe();
+    }
   }
 
   private loadDashboardData() {
