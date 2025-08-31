@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { Subject, debounceTime, distinctUntilChanged, takeUntil } from 'rxjs';
 import { ProductosService, Producto, Categoria, PaginatedResponse } from '../../services/productos';
 import { NotificationService } from '../../services/notification';
+import { PermissionsService } from '../../services/permissions';
 
 @Component({
   selector: 'app-productos',
@@ -16,6 +17,7 @@ export class ProductosComponent implements OnInit, OnDestroy {
   private productosService = inject(ProductosService);
   private router = inject(Router);
   private notificationService = inject(NotificationService);
+  private permissionsService = inject(PermissionsService);
   private destroy$ = new Subject<void>();
   private searchSubject = new Subject<string>();
 
@@ -258,5 +260,22 @@ export class ProductosComponent implements OnInit, OnDestroy {
       pages.push(i);
     }
     return pages;
+  }
+
+  // Métodos para verificar permisos
+  canCreateProduct(): boolean {
+    return this.permissionsService.can('productos.create');
+  }
+
+  canEditProduct(): boolean {
+    return this.permissionsService.can('productos.edit');
+  }
+
+  canDeleteProduct(): boolean {
+    return this.permissionsService.can('productos.delete');
+  }
+
+  canManageProducts(): boolean {
+    return this.permissionsService.canManageProducts();
   }
 }

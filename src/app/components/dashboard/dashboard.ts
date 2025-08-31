@@ -5,6 +5,7 @@ import { AuthService, User } from '../../services/auth';
 import { VentasService, EstadisticasVentas } from '../../services/ventas';
 import { ProductosService } from '../../services/productos';
 import { Subscription } from 'rxjs';
+import { PermissionsService } from '../../services/permissions';
 
 @Component({
   selector: 'app-dashboard',
@@ -18,6 +19,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private productosService = inject(ProductosService);
   private router = inject(Router);
   private userSubscription?: Subscription;
+  private permissionsService = inject(PermissionsService);
 
   currentUser: User | null = null;
   estadisticas: EstadisticasVentas = {
@@ -82,7 +84,27 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   logout() {
     this.authService.logout();
-    this.router.navigate(['/login']);
+  }
+
+  // Métodos para verificar permisos
+  canViewReports(): boolean {
+    return this.permissionsService.canViewReports();
+  }
+
+  canManageProducts(): boolean {
+    return this.permissionsService.canManageProducts();
+  }
+
+  canManageSales(): boolean {
+    return this.permissionsService.canManageSales();
+  }
+
+  isAdmin(): boolean {
+    return this.permissionsService.isAdmin();
+  }
+
+  isEmployee(): boolean {
+    return this.permissionsService.isEmployee();
   }
 
   navigateToPos() {
