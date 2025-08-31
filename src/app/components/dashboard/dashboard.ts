@@ -99,6 +99,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     return this.permissionsService.canManageSales();
   }
 
+  canManageUsers(): boolean {
+    return this.permissionsService.canManageUsers();
+  }
+
   isAdmin(): boolean {
     return this.permissionsService.isAdmin();
   }

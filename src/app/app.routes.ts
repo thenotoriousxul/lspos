@@ -9,6 +9,7 @@ import { DashboardComponent } from './components/dashboard/dashboard';
 import { PosComponent } from './components/pos/pos';
 import { ProductosComponent } from './components/productos/productos';
 import { ReportesComponent } from './components/reportes/reportes';
+import { UsuariosComponent } from './components/usuarios/usuarios';
 
 // Guard para rutas públicas (login)
 const publicGuard = () => {
@@ -43,6 +44,11 @@ export const routes: Routes = [
   { 
     path: 'productos', 
     component: ProductosComponent,
+    canActivate: [AuthGuard]
+  },
+  { 
+    path: 'usuarios', 
+    component: UsuariosComponent,
     canActivate: [AuthGuard]
   },
   { 

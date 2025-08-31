@@ -8,6 +8,7 @@ export interface User {
   email: string;
   role: 'admin' | 'employee';
   createdAt: string;
+  password?: string; // Opcional para formularios de creación/edición
 }
 
 export interface LoginCredentials {
