@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, map, interval, fromEvent } from 'rxjs';
+import { BehaviorSubject, Observable, map, interval, fromEvent, catchError, of } from 'rxjs';
 import { ApiService, ApiResponse } from './api';
 
 export interface User {
@@ -49,21 +49,15 @@ export class AuthService {
   private checkAuthStatus(): void {
     const token = localStorage.getItem('auth_token');
     if (token) {
-      this.getCurrentUser().subscribe({
-        next: (response) => {
-          if (response.success && response.data) {
-            this.currentUserSubject.next(response.data);
-          } else {
-            // Token inválido o respuesta no exitosa
-            this.logout();
-          }
-        },
-        error: (error) => {
-          console.error('Error validando token:', error);
-          // Token inválido o error de servidor
-          this.logout();
-        }
-      });
+      // Al recargar la página, confiar en el token del localStorage
+      // La validación real se hará de forma silenciosa en el background
+      console.log('Token encontrado en localStorage, validando en background...');
+      
+      // No hacer logout inmediatamente si hay problemas de red
+      // En su lugar, hacer una validación silenciosa que no afecte la experiencia del usuario
+      setTimeout(() => {
+        this.validateTokenSilently();
+      }, 1000); // Esperar 1 segundo antes de validar
     }
   }
 
@@ -96,18 +90,38 @@ export class AuthService {
     
     this.lastTokenValidation = now;
 
-    this.getCurrentUser().subscribe({
-      next: (response) => {
-        if (!response.success || !response.data) {
-          console.log('Token inválido detectado en validación automática');
-          this.logout();
-        }
-      },
-      error: (error) => {
-        console.log('Error en validación automática del token:', error);
+    this.validateTokenRobust().subscribe(isValid => {
+      if (!isValid) {
+        console.log('Token inválido detectado en validación automática');
         this.logout();
       }
     });
+  }
+
+  private validateTokenRobust(): Observable<boolean> {
+    return this.getCurrentUser().pipe(
+      map(response => {
+        if (response.success && response.data) {
+          // Token válido, actualizar usuario si no está establecido
+          if (!this.currentUserSubject.value) {
+            this.currentUserSubject.next(response.data);
+          }
+          return true;
+        } else {
+          console.log('Token inválido detectado');
+          return false;
+        }
+      }),
+      catchError(error => {
+        console.log('Error validando token:', error);
+        // Solo considerar inválido si es un error de autenticación específico
+        if (error.status === 401 || error.status === 403) {
+          return of(false);
+        }
+        // Para otros errores (red, servidor, etc.), considerar válido temporalmente
+        return of(true);
+      })
+    );
   }
 
   login(credentials: LoginCredentials): Observable<ApiResponse<AuthResponse>> {
@@ -178,9 +192,8 @@ export class AuthService {
 
   // Método público para validar token manualmente
   validateToken(): Observable<boolean> {
-    return this.getCurrentUser().pipe(
-      map(response => {
-        const isValid = response.success && !!response.data;
+    return this.validateTokenRobust().pipe(
+      map(isValid => {
         if (!isValid) {
           this.logout();
         }

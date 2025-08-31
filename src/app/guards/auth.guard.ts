@@ -32,9 +32,17 @@ export class AuthGuard implements CanActivate {
       }),
       catchError(error => {
         console.error('Error validando token en guard:', error);
-        // Token inválido o error de servidor
-        this.authService.logout();
-        return of(false);
+        
+        // Solo hacer logout si es un error de autenticación específico
+        if (error.status === 401 || error.status === 403) {
+          this.authService.logout();
+          return of(false);
+        }
+        
+        // Para otros errores (red, servidor, etc.), permitir acceso temporalmente
+        // El usuario puede seguir usando la aplicación mientras se resuelve el problema
+        console.warn('Error de conectividad detectado, permitiendo acceso temporal');
+        return of(true);
       })
     );
   }
