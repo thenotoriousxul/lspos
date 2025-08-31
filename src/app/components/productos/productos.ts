@@ -1,7 +1,8 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { Subject, debounceTime, distinctUntilChanged, takeUntil } from 'rxjs';
 import { ProductosService, Producto, Categoria, PaginatedResponse } from '../../services/productos';
 import { NotificationService } from '../../services/notification';
 
@@ -11,14 +12,20 @@ import { NotificationService } from '../../services/notification';
   templateUrl: './productos.html',
   styleUrl: './productos.css'
 })
-export class ProductosComponent implements OnInit {
+export class ProductosComponent implements OnInit, OnDestroy {
   private productosService = inject(ProductosService);
   private router = inject(Router);
   private notificationService = inject(NotificationService);
+  private destroy$ = new Subject<void>();
+  private searchSubject = new Subject<string>();
 
-  productos: Producto[] = [];
+  // Datos originales
+  allProductos: Producto[] = [];
   categorias: Categoria[] = [];
   productosStockBajo: Producto[] = [];
+  
+  // Datos filtrados
+  productos: Producto[] = [];
   
   // Filtros y búsqueda
   searchTerm = '';
@@ -26,9 +33,11 @@ export class ProductosComponent implements OnInit {
   currentPage = 1;
   totalPages = 1;
   totalItems = 0;
+  itemsPerPage = 20;
   
   // Estados
   isLoading = false;
+  isFiltering = false;
   showModal = false;
   editMode = false;
   
@@ -46,7 +55,25 @@ export class ProductosComponent implements OnInit {
   };
 
   ngOnInit() {
+    this.setupSearchDebounce();
     this.loadData();
+  }
+
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  private setupSearchDebounce() {
+    this.searchSubject.pipe(
+      debounceTime(300), // Esperar 300ms después de que el usuario deje de escribir
+      distinctUntilChanged(), // Solo emitir si el valor cambió
+      takeUntil(this.destroy$)
+    ).subscribe(() => {
+      this.currentPage = 1;
+      this.applyFilters();
+      this.isFiltering = false;
+    });
   }
 
   private async loadData() {
@@ -61,8 +88,8 @@ export class ProductosComponent implements OnInit {
       }
     });
 
-    // Cargar productos
-    this.loadProductos();
+    // Cargar todos los productos para filtrado local
+    this.loadAllProductos();
 
     // Cargar productos con stock bajo
     this.productosService.getProductosStockBajo().subscribe({
@@ -74,29 +101,16 @@ export class ProductosComponent implements OnInit {
     });
   }
 
-  loadProductos() {
+  loadAllProductos() {
     this.isLoading = true;
     
-    const params: any = {
-      page: this.currentPage,
-      limit: 20
-    };
-    
-    if (this.searchTerm) {
-      params.search = this.searchTerm;
-    }
-    
-    if (this.selectedCategoria) {
-      params.categoria_id = parseInt(this.selectedCategoria);
-    }
-
-    this.productosService.getProductos(params).subscribe({
+    // Cargar todos los productos sin paginación para filtrado local
+    this.productosService.getProductos({ limit: 1000 }).subscribe({
       next: (response) => {
         if (response.success && response.data) {
           const paginatedData = response.data as PaginatedResponse<Producto>;
-          this.productos = paginatedData.data;
-          this.totalPages = paginatedData.meta.lastPage;
-          this.totalItems = paginatedData.meta.total;
+          this.allProductos = paginatedData.data;
+          this.applyFilters();
         }
         this.isLoading = false;
       },
@@ -107,14 +121,55 @@ export class ProductosComponent implements OnInit {
     });
   }
 
+  applyFilters() {
+    let filteredProductos = [...this.allProductos];
+
+    // Filtrar por término de búsqueda
+    if (this.searchTerm.trim()) {
+      const searchLower = this.searchTerm.toLowerCase();
+      filteredProductos = filteredProductos.filter(producto => 
+        producto.nombre.toLowerCase().includes(searchLower) ||
+        producto.codigo.toLowerCase().includes(searchLower) ||
+        (producto.descripcion && producto.descripcion.toLowerCase().includes(searchLower))
+      );
+    }
+
+    // Filtrar por categoría
+    if (this.selectedCategoria) {
+      const categoriaId = parseInt(this.selectedCategoria);
+      filteredProductos = filteredProductos.filter(producto => 
+        producto.categoriaId === categoriaId
+      );
+    }
+
+    // Actualizar totales
+    this.totalItems = filteredProductos.length;
+    this.totalPages = Math.ceil(this.totalItems / this.itemsPerPage);
+    
+    // Aplicar paginación
+    const startIndex = (this.currentPage - 1) * this.itemsPerPage;
+    const endIndex = startIndex + this.itemsPerPage;
+    this.productos = filteredProductos.slice(startIndex, endIndex);
+  }
+
+  onSearchChange() {
+    this.isFiltering = true;
+    this.searchSubject.next(this.searchTerm);
+  }
+
+  onCategoriaChange() {
+    this.currentPage = 1;
+    this.applyFilters();
+  }
+
   buscarProductos() {
     this.currentPage = 1;
-    this.loadProductos();
+    this.applyFilters();
   }
 
   cambiarPagina(page: number) {
     this.currentPage = page;
-    this.loadProductos();
+    this.applyFilters();
   }
 
   abrirModal(producto?: Producto) {
@@ -159,7 +214,7 @@ export class ProductosComponent implements OnInit {
         if (response.success) {
           this.notificationService.success(this.editMode ? 'Producto actualizado exitosamente' : 'Producto creado exitosamente');
           this.cerrarModal();
-          this.loadProductos();
+          this.loadAllProductos();
         }
       },
       error: (err) => {
@@ -172,10 +227,10 @@ export class ProductosComponent implements OnInit {
     if (confirm(`¿Estás seguro de que deseas eliminar "${producto.nombre}"?`)) {
       this.productosService.deleteProducto(producto.id).subscribe({
         next: (response) => {
-          if (response.success) {
-            this.notificationService.success('Producto eliminado exitosamente');
-            this.loadProductos();
-          }
+                  if (response.success) {
+          this.notificationService.success('Producto eliminado exitosamente');
+          this.loadAllProductos();
+        }
         },
         error: (err) => {
           this.notificationService.error('Error al eliminar producto: ' + (err.error?.message || 'Error desconocido'));
